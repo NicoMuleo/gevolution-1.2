@@ -364,7 +364,14 @@ int main(int argc, char **argv)
 	}
 	if (numparam > 0) free(params);
 #endif
-
+	
+	// (nicmodify)
+	
+	int Npoint=7, point[7][3];
+	double Tab[7][10];
+	
+	
+	
 	while (true)    // main loop
 	{
 #ifdef BENCHMARK		
@@ -405,6 +412,14 @@ int main(int argc, char **argv)
 			}
 		}
 		projection_T00_comm(&source);
+
+//TODO make a lock of the lattice 
+//Aggiungi nell'if se c'è un Omega_k(si impone a mano che il valore al contorno sia cosmo.Omega_m)
+	if(cosmo.Omega_k != 0.){
+	for(x.first();x.test();x.next()){
+		if(x.coord(0) == 0 || x.coord(1)==0 || x.coord(2) == 0) source(x)=cosmo.Omega_m; 
+	}
+	}
 		
 #ifdef VELOCITY
 		if ((sim.out_pk & MASK_VEL) || (sim.out_snapshot & MASK_VEL))
@@ -450,6 +465,63 @@ int main(int argc, char **argv)
 		ref_time = MPI_Wtime();
 #endif
 		
+		//TODO move here (nicmodify)
+		Bi.updateHalo();
+		Sij.updateHalo();
+		
+		point[0][0]=sim.numpts/2;
+		point[0][1]=sim.numpts/2;
+		point[0][2]=sim.numpts/2;
+		
+		point[1][0]=sim.numpts/2;
+		point[1][1]=sim.numpts*2/3;
+		point[1][2]=sim.numpts/2;
+		
+		point[2][0]=sim.numpts/2;
+		point[2][1]=sim.numpts*2/3;
+		point[2][2]=sim.numpts*2/3;
+		
+		point[3][0]=sim.numpts*2/3;
+		point[3][1]=sim.numpts*2/3;
+		point[3][2]=sim.numpts*2/3;
+		
+		point[4][0]=2;
+		point[4][1]=2;
+		point[4][2]=2;
+		
+		point[5][0]=sim.numpts/2 + sim.numpts*1/13;
+		point[5][1]=sim.numpts/2 - sim.numpts*2/13;
+		point[5][2]=sim.numpts/2 + sim.numpts*3/13;
+		
+		point[6][0]=sim.numpts/2 + sim.numpts*3/13;
+		point[6][1]=sim.numpts/2 - sim.numpts*3/15;
+		point[6][2]=sim.numpts/2 + sim.numpts*3/17;
+		
+		for(i=0; i<Npoint; i++){
+			for(j=0; j<10; j++){
+				Tab[i][j]=0;
+			}
+		}
+		for(i=0; i<Npoint; i++){
+			if(x.setCoord(point[i][0],point[i][1],point[i][2])){
+				Tab[i][0]=-source(x)/(a*a*a);
+				for(j=0; j<3; j++){
+					Tab[i][j+1]=Sij(x,j,j)/pow(a,3.);
+					Tab[i][j+4]=0.5*(Bi(x,j)+Bi(x-j,j))/pow(a,4.);
+				}
+				Tab[i][7]=0.25*(Sij(x,0,1)+Sij(x-0,0,1)+Sij(x-1,0,1)+Sij(x-0-1,0,1))/pow(a,3.);
+				Tab[i][8]=0.25*(Sij(x,0,2)+Sij(x-0,0,2)+Sij(x-2,0,2)+Sij(x-0-2,0,2))/pow(a,3.);
+				Tab[i][9]=0.25*(Sij(x,1,2)+Sij(x-1,1,2)+Sij(x-2,1,2)+Sij(x-1-2,1,2))/pow(a,3.);
+			}
+		}
+		for(i=0; i<Npoint; i++){
+			parallel.sum(Tab[i],10);
+		}
+		
+		
+		
+		
+		
 		if (sim.gr_flag > 0)
 		{	
 			T00hom = 0.;
@@ -466,7 +538,7 @@ int main(int argc, char **argv)
 			if (dtau_old > 0.)
 			{
 				prepareFTsource<Real>(phi, chi, source, cosmo.Omega_cdm + cosmo.Omega_b + bg_ncdm(a, cosmo), source, 3. * Hconf(a, fourpiG, cosmo) * dx * dx / dtau_old, fourpiG * dx * dx / a, 3. * Hconf(a, fourpiG, cosmo) * Hconf(a, fourpiG, cosmo) * dx * dx);  // prepare nonlinear source for phi update
-
+			//Here the T00 stress-energy tensor component is overwritten. 
 #ifdef BENCHMARK
 				ref2_time= MPI_Wtime();
 #endif
@@ -512,7 +584,12 @@ int main(int argc, char **argv)
 		}
 
 		phi.updateHalo();  // communicate halo values
-
+		
+		//TODO move from here before the computation
+		
+		//TODO move to here before the computation
+		
+		
 		// record some background data
 		if (kFT.setCoord(0, 0, 0))
 		{
@@ -523,10 +600,31 @@ int main(int argc, char **argv)
 				cout << " error opening file for background output!" << endl;
 			}
 			else
-			{
-				if (cycle == 0)
-					fprintf(outfile, "# background statistics\n# cycle   tau/boxsize    a             conformal H/H0  phi(k=0)       T00(k=0)\n");
-				fprintf(outfile, " %6d   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG, cosmo) / Hconf(1., fourpiG, cosmo), scalarFT(kFT).real(), T00hom);
+			{ 
+				if (cosmo.Omega_k==0.){
+					// cout << "PRINTING FLAT\n";
+					if (cycle == 0)
+						fprintf(outfile, "# background statistics\n# cycle   tau/boxsize    a             conformal H/H0  phi(k=0)       T00(k=0)\n");
+					fprintf(outfile, " %6d   %e   %e   %e   %e   %e\n", cycle, tau, a, Hconf(a, fourpiG, cosmo) / Hconf(1., fourpiG, cosmo), scalarFT(kFT).real(), T00hom);
+				}
+				else{
+					if (cycle == 0){
+						// cout << "PRINTING THE TOP LABEL\n";
+						fprintf(outfile, "# background statistics\n# cycle   tau/boxsize    a             conformal H/H0  phi(k!=0)       T00(k!=0)");
+						for(i=0; i<Npoint; i++)
+							fprintf(outfile, "  (%d_%d_%d)T00             T11             T22             T33             T01             T02             T03             T12             T13             T23  ", point[i][0], point[i][1], point[i][2]);
+						fprintf(outfile, "      Omega_k=  %e\n", (double)cosmo.Omega_k);
+					}
+					// cout << "PRINTING THE THING\n";
+					fprintf(outfile, " %6d   %e   %e   %e   %e   %e", cycle, tau, a, Hconf(a, fourpiG, cosmo) / Hconf(1., fourpiG, cosmo), scalarFT(kFT).real(), T00hom); 
+					for(i=0; i<Npoint; i++){
+						fprintf(outfile, "      ");
+						for(j=0; j<10; j++)
+							fprintf(outfile, "   %e", Tab[i][j]);
+					}
+					fprintf(outfile, "\n");
+					//TODO here insert the density check (nicmodify)
+				}
 				fclose(outfile);
 			}
 		}

@@ -57,7 +57,7 @@ using namespace LATfield2;
 // 
 //////////////////////////
 
-void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * part, double * ref_dist, part_simple_info partInfo, Field<Real> ** fields, Site * sites, int nfield, double * params, double * outputs, int noutputs)
+void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * part, double * ref_dist, part_simple_info partInfo, Field<Real> ** fields, Site * sites, int nfield, double * param, double * outputs, int noutputs)
 {
 	int i;
 	Real gradxi[3] = {0, 0, 0};
@@ -86,8 +86,56 @@ void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * p
 	
 	if (noutputs > 0)
 		*outputs = coeff * sqrt(gradxi[0]*gradxi[0] + gradxi[1]*gradxi[1] + gradxi[2]*gradxi[2]);
-
+	
+	if (param==NULL){
 	for (i = 0; i < 3; i++) (*part).pos[i] += coeff*gradxi[i];
+}
+	else
+{
+	double dist, delta_1, delta_d, r1, cor, a_in, inside, Q, omega_k, L, r1o;
+	double r2;
+	r2= param[2];   //0.5- 2.*lat_resolution
+	inside= 0.;
+	dist=0.0;
+	delta_1= param[6];
+	r1= param[7];
+	Q= param[3];
+	omega_k= param[4];
+	L= param[5];
+	
+	r1o= r1 ;//*(1. + omega_k*r1*r1/6.+1.25* Q * delta_1*delta_1 + omega_k/(3.*param[1]*param[1]) - omega_k*r1*r1* omega_k*r1*r1/18. - 5.*omega_k*omega_k*r1*r1/(9.*param[1]*param[1])+ omega_k*omega_k/(9.*param[1]*param[1]*param[1]*param[1]));
+	//r1o=r1-0.5*r1*(0.3*omega_k*(r1*r1-r1*r1*5./3.) - Q*(5./6.)*(r1*r1+ 2.*r2*r2*r2/r1-3.*r2*r2) - 0.4*omega_k/(param[1]*param[1]));
+	
+	for (i = 0; i < 3; i++) dist = dist + pow(((*part).pos[i]-0.5),2.);
+	dist=sqrt(dist);
+	
+	delta_d= (r2- dist)/r2;
+	
+	
+	if(dist>=r2){
+		//cor= r1o*r1o*(r2- r1o)/(dist*dist);
+		//cor= (r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*pow(delta_1,3));
+		cor= ((4.5*Q+3.*param[1]*param[1]*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*pow(delta_1,3)));
+		inside=0.;
+	}
+	else{
+		if (dist>=r1o){
+			//cor= r1o*r1o*(r2- r1o)/(dist*dist);
+			//cor= (r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*(pow(delta_1,3)-pow(delta_d,3)))- (2./(3.*param[1]*param[1]*r2))*(1.5*Q*delta_d- 3.*0.5*Q*(Q+L-1.)*delta_d*delta_d);
+			cor= ((4.5*Q+3.*param[1]*param[1]*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*(pow(delta_1,3)-pow(delta_d,3))))- (2.*r2/(3.*Q))*(1.5*Q*delta_d+ 3.*0.5*Q*delta_d*delta_d);
+			inside = 0.;
+		}
+		else{
+			//cor= 0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1 - omega_k*dist/(3.*param[1]*param[1]) ;
+			//cor= 0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1 - dist* omega_k*r2*r2/(3.*Q) ;
+			//cor= dist*(0.3*omega_k*(dist*dist-r1*r1*5./3.) - Q*(5./6.)*(r1*r1+ 2.*r2*r2*r2/r1-3.*r2*r2) - 0.4* omega_k/(param[1]*param[1]));
+			cor = ((4.5*Q+3.*param[1]*param[1]*r2*r2)/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1) -dist* omega_k*r2*r2/(3.*Q) ;
+			inside = 1.;
+		}
+	}
+	for (i = 0; i < 3; i++) (*part).pos[i] += inside*coeff*gradxi[i] +(((*part).pos[i]-0.5)/dist) *cor;
+
+}
 }
 
 
@@ -115,7 +163,7 @@ void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * p
 // 
 //////////////////////////
 
-Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * part, double * ref_dist, part_simple_info partInfo, Field<Real> ** fields, Site * sites, int nfield, double * params, double * outputs, int noutputs)
+Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * part, double * ref_dist, part_simple_info partInfo, Field<Real> ** fields, Site * sites, int nfield, double * param, double * outputs, int noutputs)
 {
 	int i;
 	Real gradPhi[3] = {0, 0, 0};
@@ -143,10 +191,61 @@ Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * pa
 	gradPhi[1] /= lat_resolution;
 	gradPhi[2] /= lat_resolution;  
 	
+	if (param==NULL){
 	for (i = 0 ; i < 3; i++)
 	{
 		(*part).vel[i] = -gradPhi[i] * coeff;
 		v2 += (*part).vel[i] * (*part).vel[i];
+	}
+	}
+	else{
+		double dist, delta_1, delta_d, r1, cor, a_in, inside, Q, omega_k, L;
+		double r2;
+		r2= param[2];   //0.5- 2.*lat_resolution
+		inside= 0.;
+		dist=0.0;
+		delta_1= param[6];
+		r1= param[7];
+		Q= param[3];
+		omega_k= param[4];
+		L=param[5];
+		
+		for (i = 0; i < 3; i++) dist = dist + pow(((*part).pos[i]-0.5),2.);
+		dist=sqrt(dist);
+		
+		delta_d= (r2- dist)/r2;
+			
+		if(dist>=r2){
+			cor= 0.;
+			//cor=(5./6.)*omega_k*delta_1*param[1]*(pow(r1,4)*r2/(dist*dist))-(r2*r2*r2/(dist*dist))*1.25*param[1]*Q*delta_1*delta_1;
+			cor= cor+ ((9.*param[1]*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
+			cor= cor+ ((4.5*Q+3.*param[1]*param[1]*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* param[1]*0.25*omega_k*(r1- r1*5./3.) -2.*param[1] *(5./4.)*Q*delta_1*delta_1+param[1] *(5./4.)*Q*delta_1*delta_1);
+			inside= 0.;
+		}
+		else{
+			if(dist>=r1){
+				//cor=  -(2. /(3.*r2* param[1])) * (1.5*Q*delta_d - 1.5*Q*(Q +L - 1. )* delta_d* delta_d ); 
+				//cor= (5./6.)*omega_k*delta_1*param[1]*(pow(r1,4)*r2/(dist*dist)) -(r2*r2*r2/(dist*dist))*1.25*param[1]*Q*delta_1*delta_1 - param[1]*Q*r2*delta_d*delta_d;
+				cor=0.;
+				//cor= (2.*r2/3.)*( 3.*0.5*param[1]*(-Q+2.*L)*delta_d*delta_d);
+				cor= cor+ ((9.*param[1]*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
+				cor= cor+ ((4.5*Q+3.*param[1]*param[1]*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* param[1]*0.25*omega_k*(r1- r1*5./3.) -2.*param[1] *(5./4.)*Q*delta_1*delta_1+ param[1]*(5./4.)*Q*delta_1*delta_1 );
+				inside= 0.;
+			}
+			else{
+				//cor= -  omega_k * dist/ (3.*param[1]) ;
+				//cor= (5./6.)*Omega_k*dist*r1*r2*param[1]*delta_1- 1.25*dist*param[1]*Q*delta_1*delta_1 -  dist* Omega_k*r2*r2*param[1]/ (3.*Q);
+				cor= -   dist*omega_k *r2*r2* param[1]/ (3.*Q) ;
+				cor= cor + (9.*param[1]*L/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1);
+				cor=cor + ((4.5*Q+3.*param[1]*param[1]*r2*r2)/(7.5*Q))*(0.25*omega_k*(dist*r1*r2*delta_1*param[1]*10./3.) - (5./2.)*dist*Q*delta_1*delta_1*param[1]+(5./4.)*dist*Q*delta_1*delta_1);
+				inside=1.;
+			}
+		}
+		for (i = 0 ; i < 3; i++)
+		{
+			(*part).vel[i] = -gradPhi[i] * coeff * inside + (((*part).pos[i]-0.5)/dist)*cor*param[0];
+			v2 += (*part).vel[i] * (*part).vel[i];
+		}
 	}
 	
 	return v2;
@@ -2001,13 +2100,29 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	pcls_cdm_info.relativistic = false;
 	
 	pcls_cdm->initialize(pcls_cdm_info, pcls_cdm_dataType, &(phi->lattice()), boxSize);
+	double param[8];	//Definition of parameters Omega_k (curvature) (TOLTA UNA PARENTESI TONDA NELLA LINEA DOPO NON DOVREBBE ESSERE UN PROBLEMA) nicmodify
+	
+	param[0]=1./(1.+sim.z_in);																		//a_tin (_a_zo)
+	param[1]=Hconf(param[0], fourpiG, cosmo);														//H(t_in) a(t_in)
+	//param[1]=sqrt(cosmo.Omega_m * cosmo.h*cosmo.h / param[0]);
+	param[2]= 0.45;																					//r2 = 0.5- 2.*lat_resolution 
+	param[3]= cosmo.Omega_m * Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)* param[2] *param[2] / param[0];						//= Q= (cosmo.Omega_m*cosmo.h*cosmo.h)*r2*r2/a(t_in) = H(t_in)^2*a(t_in)^2*r2*r2 = // Bisogna controllare le unità di misura  multipy by Hconf(1, fourpiG, cosmo)
+	//param[3]= param[1]*param[1]* param[0]*param[0]*param[2]*param[2];											//0.5 (cosmo.Omega_b + cosmo.Omega_cdm) * cosmo.h*cosmo.h/ param[0]; 			// = Q = omega_m(t_in)* a*a
+	//param[4]= cosmo.Omega_k* Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo);														//k/h^2= Omega_k
+	param[4]= cosmo.Omega_k;																											//k= omega_k
+	param[5]=(1./3.)* cosmo.Omega_Lambda*  Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)* param[0]*param[0]*param[2]*param[2];		//L
+	//param[6]=param[2]* param[2]* param[4]/(3.*param[3])+ param[2]* param[2]* param[4]*param[2]* param[2]* param[4]* (param[3] + param[5]-2.)/(9.*param[3]*param[3]); //delta_r1= (r2-r1)/r2 (for now order k)
+	param[6]=param[2]* param[2]* param[4]/(3.*param[3])- 2.* (param[2]* param[2]* param[4]/(3.*param[3]))*(param[2]* param[2]* param[4]/(3.*param[3])); //delta_r1= (r2-r1)/r2 (for now order k)
+	param[7]= param[2]*(1.- param[6]); 
+	//param[7]= param[2]/cbrt(1+ 0.6* cosmo.Omega_k/((cosmo.Omega_b + cosmo.Omega_cdm)/ param[0])); //
+	
 	
 	initializeParticlePositions(sim.numpcl[0], pcldata, ic.numtile[0], *pcls_cdm);
 	i = MAX;
 	if (sim.baryon_flag == 3)	// baryon treatment = hybrid; displace particles using both displacement fields
-		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., ic_fields, 2, NULL, &max_displacement, &i, 1);
+		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., ic_fields, 2, param, &max_displacement, &i, 1);
 	else
-		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., &chi, 1, NULL, &max_displacement, &i, 1);	// displace CDM particles
+		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., &chi, 1, param, &max_displacement, &i, 1);	// displace CDM particles
 	
 	sim.numpcl[0] *= (long) ic.numtile[0] * (long) ic.numtile[0] * (long) ic.numtile[0];
 	
@@ -2043,7 +2158,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	
 		initializeParticlePositions(sim.numpcl[1], pcldata, ic.numtile[1], *pcls_b);
 		i = MAX;
-		pcls_b->moveParticles(displace_pcls_ic_basic, 1., &phi, 1, NULL, &max_displacement, &i, 1);	// displace baryon particles
+		pcls_b->moveParticles(displace_pcls_ic_basic, 1., &phi, 1, param, &max_displacement, &i, 1);	// displace baryon particles
 	
 		sim.numpcl[1] *= (long) ic.numtile[1] * (long) ic.numtile[1] * (long) ic.numtile[1];
 	
@@ -2074,12 +2189,12 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 		gsl_spline_free(tk_t1);			
 		
 		if (sim.baryon_flag == 3)	// baryon treatment = hybrid; set velocities using both velocity potentials
-			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., ic_fields, 2) / a;
+			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., ic_fields, 2, param) / a;
 		else
-			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., &chi, 1) / a;	// set CDM velocities
+			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., &chi, 1, param) / a;	// set CDM velocities
 		
 		if (sim.baryon_flag == 1)
-			maxvel[1] = pcls_b->updateVel(initialize_q_ic_basic, 1., &phi, 1) / a;	// set baryon velocities
+			maxvel[1] = pcls_b->updateVel(initialize_q_ic_basic, 1., &phi, 1, param) / a;	// set baryon velocities
 	}
 	
 	if (sim.baryon_flag > 1) sim.baryon_flag = 0;
@@ -2208,7 +2323,51 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	}
 	
 	plan_phi->execute(FFT_BACKWARD);
+
+//TODO Add here the initial potential field nicmodify
+	double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k;
+	inside = 1.;
+	r2= param[2];
+	delta_1= param[6];
+	r1= param[7];
+	Q = param[3];
+	omega_k= param[4];
+	
+	for(x.first();x.test();x.next())
+	{
+	dist=0;
+	
+	for(i=0;i<3;i++) {
+	dist+= pow(((double)x.coord(i)/(double)sim.numpts-0.5),2.);}
+	dist=sqrt(dist);
+	
+	delta_d = (r2- dist)/r2;
+	
+	
+	if(dist>= r2) {
+		corR=0.;
+		inside=0.;
+	}
+	else{
+		if(dist>= r1){ 
+			corR= - 0.75* Q*delta_d * delta_d - 0.5* Q*delta_d * delta_d * delta_d ;  
+			//corR= - Q* (0.5* dist *dist + r2*r2*r2/dist - 1.5 *r2*r2);
+			inside=0.;
+		}
+		else{
+			corR= omega_k*(dist*dist - r1*r1)*0.25-  0.75 *Q * delta_1*delta_1 - 0.5* Q*delta_1 * delta_1 * delta_1; 
+			//corR= 0.3 *omega_k *(dist*dist- r1*r1) - Q* (0.5 *r1 *r1 + r2*r2*r2/r1 - 1.5* r2*r2);
+			inside=1.;
+		}
+	}
+	(*phi)(x) = (*phi)(x) * inside + corR;
+	}
+//Finish adding initial potential field
+	
+
 	phi->updateHalo();	// phi now finally contains phi
+	
+	phi->saveHDF5(std::string("lcdm_snap100_phi.h5"));      //da convertire in standard library styring std::
 	
 	if (ic.pkfile[0] != '\0')	// if power spectrum is used instead of transfer functions, set velocities using linear approximation
 	{	
