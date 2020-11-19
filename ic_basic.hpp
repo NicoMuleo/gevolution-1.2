@@ -87,9 +87,54 @@ void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * p
 	if (noutputs > 0)
 		*outputs = coeff * sqrt(gradxi[0]*gradxi[0] + gradxi[1]*gradxi[1] + gradxi[2]*gradxi[2]);
 
-	for (i = 0; i < 3; i++) (*part).pos[i] += coeff*gradxi[i];
-}
-
+		//Start nicmodify (adding curved potential)
+	if (params == NULL) {
+		for (i = 0; i < 3; i++) (*part).pos[i] += coeff*gradxi[i];
+	}
+	else {
+		double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k, r1o;
+		inside = 1.;
+		
+		omega_k= params[0];
+		r2= params[1];
+		Q = params[3];
+		L = params[4];
+		delta_1= params[5];
+		r1= r2*(1.- delta_1);
+		
+		r1o = r1;
+		
+		for(x.first();x.test();x.next())
+		{
+		dist=0;
+		
+		for(i=0;i<3;i++) {
+		dist+= pow(((double)x.coord(i)/(double)sim.numpts-0.5),2.);}
+		dist=sqrt(dist);
+		
+		delta_d = (r2- dist)/r2;
+		
+		
+		if(dist>= r2) {
+			corR= ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*pow(delta_1,3)));
+		inside=0.;
+		}
+		else{
+			if (dist >= r1o){
+				corR= ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*(pow(delta_1,3)-pow(delta_d,3))))- (2.*r2/(3.*Q))*(1.5*Q*delta_d- 3.*0.5*Q*(Q+L-1.)*delta_d*delta_d);
+			inside = 0.;
+			}
+			else{
+				corR = ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1) -dist* omega_k*r2*r2/(3.*Q) ;
+			inside = 1.;
+			}
+		}
+		for (i = 0; i < 3; i++) (*part).pos[i] += inside*coeff*gradxi[i] +(((*part).pos[i]-0.5)/dist) *corR;
+		}
+		
+	}
+	//End nicmodify
+	}
 
 //////////////////////////
 // initialize_q_ic_basic
@@ -2002,6 +2047,19 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	
 	pcls_cdm->initialize(pcls_cdm_info, pcls_cdm_dataType, &(phi->lattice()), boxSize);
 	
+	//NicModify start
+	if (cosmo.Omega_k > 0){
+		double params[6];
+		
+		params[0] = cosmo.Omega_k;	//curvature cosmological parameter
+		params[1] = 0.45;		// cosmo.external_shell //The external shell in case of curved universe simulation
+		params[2] = Hconf(1./(1.+sim.z_in), fourpiG, cosmo); //dot(a)(t_ini)
+		params[3] = cosmo.Omega_m * Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)* param[1] *param[1] * (1.+sim.z_in);  //Q
+		params[4] = (1./3.)* cosmo.Omega_Lambda*  Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)*param[1]*param[1]/ ((1.+sim.z_in)*(1.+sim.z_in)); //L
+		params[5] = param[1]* param[1]* params[0]/(3.*param[3])+ param[1]* param[1]* params[0]*param[1]* param[1]* params[0]* (param[3] + param[4]-2.)/(9.*param[3]*param[3]); //delta_r1
+	}
+	//NicModify end
+	
 	initializeParticlePositions(sim.numpcl[0], pcldata, ic.numtile[0], *pcls_cdm);
 	i = MAX;
 	if (sim.baryon_flag == 3)	// baryon treatment = hybrid; displace particles using both displacement fields
@@ -2208,6 +2266,53 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	}
 	
 	plan_phi->execute(FFT_BACKWARD);
+	
+	//Start nicmodify (adding curved potential)
+	if (params != NULL){
+	double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k;
+	inside = 1.;
+	
+	r2= params[1];
+	delta_1= params[5];
+	r1= r2*(1.- delta_1);
+	Q = params[3];
+	L = params[4]
+	omega_k= params[0];
+	
+	
+	for(x.first();x.test();x.next())
+	{
+	dist=0;
+	
+	for(i=0;i<3;i++) {
+	dist+= pow(((double)x.coord(i)/(double)sim.numpts-0.5),2.);}
+	dist=sqrt(dist);
+	
+	delta_d = (r2- dist)/r2;
+	
+	
+	if(dist>= r2) {
+		corR=0.;
+		inside=0.;
+	}
+	else{
+		if(dist>= r1){ 
+			corR= - 0.75* Q*delta_d * delta_d + 0.5* Q*(Q+ L-1.)*delta_d * delta_d * delta_d ;  
+			//corR= - Q* (0.5* dist *dist + r2*r2*r2/dist - 1.5 *r2*r2);
+			inside=0.;
+		}
+		else{
+			corR= omega_k*(dist*dist - r1*r1)*0.25-  0.75 *Q * delta_1*delta_1 + 0.5* Q*(Q+ L-1.)*delta_1 * delta_1 * delta_1; 
+			//corR= 0.3 *omega_k *(dist*dist- r1*r1) - Q* (0.5 *r1 *r1 + r2*r2*r2/r1 - 1.5* r2*r2);
+			inside=1.;
+		}
+	}
+	(*phi)(x) = (*phi)(x) * inside + corR;
+	}
+	
+	}
+	//End nicmodify
+	
 	phi->updateHalo();	// phi now finally contains phi
 	
 	if (ic.pkfile[0] != '\0')	// if power spectrum is used instead of transfer functions, set velocities using linear approximation
