@@ -188,11 +188,59 @@ Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * pa
 	gradPhi[1] /= lat_resolution;
 	gradPhi[2] /= lat_resolution;  
 	
-	for (i = 0 ; i < 3; i++)
-	{
-		(*part).vel[i] = -gradPhi[i] * coeff;
-		v2 += (*part).vel[i] * (*part).vel[i];
+	// start nicmodify
+	if (param==NULL){
+		for (i = 0 ; i < 3; i++)
+		{
+			(*part).vel[i] = -gradPhi[i] * coeff;
+			v2 += (*part).vel[i] * (*part).vel[i];
+		}
 	}
+	else{
+		double r2, dist, delta_1, delta_d, r1, corR, a_in, inside, Q, omega_k, L;
+		omega_k= params[0];
+		r2= params[1];   //0.5- 2.*lat_resolution
+		Q= params[3];
+		L=params[4];
+		delta_1= params[5];
+		
+		r1= r2*(1. - delta_1);
+		
+		inside= 0.;
+		dist=0.0;
+		
+		for (i = 0; i < 3; i++) dist = dist + pow(((*part).pos[i]-0.5),2.);
+		dist=sqrt(dist);
+		
+		delta_d= (r2- dist)/r2;
+			
+		if(dist>=r2){
+			corR = 0.;
+			corR = corR + ((9.*params[2]*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
+			corR = corR + ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* params[2]*0.25*omega_k*(r1- r1*5./3.) -2.*params[2] *(5./4.)*Q*delta_1*delta_1+param[2] *(5./4.)*Q*delta_1*delta_1);
+			inside= 0.;
+		}
+		else{
+			if(dist>=r1){
+				corR = (2.*r2/3.)*( 3.*0.5*params[1]*(-Q+2.*L)*delta_d*delta_d);
+				corR = corR + ((9.*params[2]*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
+				corR = corR + ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* params[2]*0.25*omega_k*(r1- r1*5./3.) -2.*params[2] *(5./4.)*Q*delta_1*delta_1+ params[2]*(5./4.)*Q*delta_1*delta_1 );
+				inside= 0.;
+			}
+			else{
+				corR = - dist*omega_k *r2*r2* params[2]/ (3.*Q) ;
+				corR = corR + (9.*params[2]*L/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1);
+				corR = corR + ((4.5 * Q + 3. * params[2] * params[2] * r2 * r2) / (7.5 * Q)) *(0.25 * omega_k* (dist * r1 * r2 * delta_1 * params[2] * 10./3.) - (5./2.) * dist * Q * delta_1 * delta_1 * params[2] + (5./4.) * dist * Q * delta_1 * delta_1);
+				inside=1.;
+			}
+		}
+		for (i = 0 ; i < 3; i++)
+		{
+			(*part).vel[i] = -gradPhi[i] * coeff * inside + (((*part).pos[i]-0.5)/dist)* corR *param[6];
+			v2 += (*part).vel[i] * (*part).vel[i];
+		}
+	}
+	//end nicmodify
 	
 	return v2;
 }
@@ -2047,9 +2095,9 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	
 	pcls_cdm->initialize(pcls_cdm_info, pcls_cdm_dataType, &(phi->lattice()), boxSize);
 	
-	//NicModify start
+	//start nicmodify
 	if (cosmo.Omega_k > 0){
-		double params[6];
+		double params[7];
 		
 		params[0] = cosmo.Omega_k;	//curvature cosmological parameter
 		params[1] = 0.45;		// cosmo.external_shell //The external shell in case of curved universe simulation
@@ -2057,8 +2105,9 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 		params[3] = cosmo.Omega_m * Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)* param[1] *param[1] * (1.+sim.z_in);  //Q
 		params[4] = (1./3.)* cosmo.Omega_Lambda*  Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)*param[1]*param[1]/ ((1.+sim.z_in)*(1.+sim.z_in)); //L
 		params[5] = param[1]* param[1]* params[0]/(3.*param[3])+ param[1]* param[1]* params[0]*param[1]* param[1]* params[0]* (param[3] + param[4]-2.)/(9.*param[3]*param[3]); //delta_r1
+		params[6] = 1./ (1.+sim.z_in);
 	}
-	//NicModify end
+	//end nicmodify
 	
 	initializeParticlePositions(sim.numpcl[0], pcldata, ic.numtile[0], *pcls_cdm);
 	i = MAX;
@@ -2267,51 +2316,51 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	
 	plan_phi->execute(FFT_BACKWARD);
 	
-	//Start nicmodify (adding curved potential)
+	//start nicmodify (adding curved potential)
 	if (params != NULL){
-	double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k;
-	inside = 1.;
-	
-	r2= params[1];
-	delta_1= params[5];
-	r1= r2*(1.- delta_1);
-	Q = params[3];
-	L = params[4]
-	omega_k= params[0];
-	
-	
-	for(x.first();x.test();x.next())
-	{
-	dist=0;
-	
-	for(i=0;i<3;i++) {
-	dist+= pow(((double)x.coord(i)/(double)sim.numpts-0.5),2.);}
-	dist=sqrt(dist);
-	
-	delta_d = (r2- dist)/r2;
-	
-	
-	if(dist>= r2) {
-		corR=0.;
-		inside=0.;
-	}
-	else{
-		if(dist>= r1){ 
-			corR= - 0.75* Q*delta_d * delta_d + 0.5* Q*(Q+ L-1.)*delta_d * delta_d * delta_d ;  
-			//corR= - Q* (0.5* dist *dist + r2*r2*r2/dist - 1.5 *r2*r2);
-			inside=0.;
+		double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k;
+		inside = 1.;
+		
+		r2= params[1];
+		delta_1= params[5];
+		r1= r2*(1.- delta_1);
+		Q = params[3];
+		L = params[4]
+		omega_k= params[0];
+		
+		
+		for(x.first();x.test();x.next())
+		{
+			dist=0;
+			
+			for(i=0;i<3;i++) {
+			dist+= pow(((double)x.coord(i)/(double)sim.numpts-0.5),2.);}
+			dist=sqrt(dist);
+			
+			delta_d = (r2- dist)/r2;
+			
+			
+			if(dist>= r2) {
+				corR=0.;
+				inside=0.;
+			}
+			else{
+				if(dist>= r1){ 
+					corR= - 0.75* Q*delta_d * delta_d + 0.5* Q*(Q+ L-1.)*delta_d * delta_d * delta_d ;  
+					//corR= - Q* (0.5* dist *dist + r2*r2*r2/dist - 1.5 *r2*r2);
+					inside=0.;
+				}
+				else{
+					corR= omega_k*(dist*dist - r1*r1)*0.25-  0.75 *Q * delta_1*delta_1 + 0.5* Q*(Q+ L-1.)*delta_1 * delta_1 * delta_1; 
+					//corR= 0.3 *omega_k *(dist*dist- r1*r1) - Q* (0.5 *r1 *r1 + r2*r2*r2/r1 - 1.5* r2*r2);
+					inside=1.;
+				}
+			}
+			(*phi)(x) = (*phi)(x) * inside + corR;
 		}
-		else{
-			corR= omega_k*(dist*dist - r1*r1)*0.25-  0.75 *Q * delta_1*delta_1 + 0.5* Q*(Q+ L-1.)*delta_1 * delta_1 * delta_1; 
-			//corR= 0.3 *omega_k *(dist*dist- r1*r1) - Q* (0.5 *r1 *r1 + r2*r2*r2/r1 - 1.5* r2*r2);
-			inside=1.;
-		}
-	}
-	(*phi)(x) = (*phi)(x) * inside + corR;
-	}
 	
 	}
-	//End nicmodify
+	//end nicmodify
 	
 	phi->updateHalo();	// phi now finally contains phi
 	
