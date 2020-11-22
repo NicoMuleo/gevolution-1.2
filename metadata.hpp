@@ -278,6 +278,7 @@ struct cosmology
 	double Omega_ur;
 	double Omega_rad;
 	double Omega_ncdm[MAX_PCL_SPECIES-2];
+	double Omega_k;
 	double h;
 	double m_ncdm[MAX_PCL_SPECIES-2];
 	double T_ncdm[MAX_PCL_SPECIES-2];

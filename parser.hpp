@@ -1669,6 +1669,11 @@ int parseMetadata(parameter * & params, const int numparam, metadata & sim, cosm
 		cosmo.Omega_g = 0.;
 	}
 	
+	if (!parseParameter(params, numparam, "Omega_k", cosmo.Omega_k))
+	{	
+		cosmo.Omega_k = 0.;
+	}
+	
 	if (parseParameter(params, numparam, "N_ur", cosmo.Omega_ur))
 	{
 		cosmo.Omega_ur *= (7./8.) * pow(4./11., 4./3.) * cosmo.Omega_g;
