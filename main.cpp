@@ -406,6 +406,14 @@ int main(int argc, char **argv)
 		}
 		projection_T00_comm(&source);
 		
+		//TODO make a lock of the lattice 
+	if(cosmo.Omega_k != 0.){
+		for(x.first();x.test();x.next()){
+			if(x.coord(0) == 0 || x.coord(1)==0 || x.coord(2) == 0) source(x)=cosmo.Omega_m; 
+		}
+	}
+		
+		
 #ifdef VELOCITY
 		if ((sim.out_pk & MASK_VEL) || (sim.out_snapshot & MASK_VEL))
 		{
