@@ -92,11 +92,12 @@ void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * p
 		for (i = 0; i < 3; i++) (*part).pos[i] += coeff*gradxi[i];
 	}
 	else {
-		double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k, r1o;
+		double dist, delta_d, r2, r1, delta_1, L, cor, inside, Q, omega_k, r1o, H;
 		inside = 1.;
 		
 		omega_k= params[0];
-		r2= params[1];
+		r2 = params[1];
+		H = params[2];
 		Q = params[3];
 		L = params[4];
 		delta_1= params[5];
@@ -104,33 +105,30 @@ void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * p
 		
 		r1o = r1;
 		
-		for(x.first();x.test();x.next())
-		{
+		
 		dist=0;
 		
-		for(i=0;i<3;i++) {
-		dist+= pow(((double)x.coord(i)/(double)sim.numpts-0.5),2.);}
+		for (i = 0; i < 3; i++) dist = dist + pow(((*part).pos[i]-0.5),2.);
 		dist=sqrt(dist);
 		
 		delta_d = (r2- dist)/r2;
 		
 		
 		if(dist>= r2) {
-			corR= ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*pow(delta_1,3)));
+			cor = ((4.5*Q+3.*H*H*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*pow(delta_1,3)));
 		inside=0.;
 		}
 		else{
 			if (dist >= r1o){
-				corR= ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*(pow(delta_1,3)-pow(delta_d,3))))- (2.*r2/(3.*Q))*(1.5*Q*delta_d- 3.*0.5*Q*(Q+L-1.)*delta_d*delta_d);
+				cor = ((4.5*Q+3.*H*H*r2*r2)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1)+ (5.*r2*r2*r2/(dist*dist))*(0.25*Q*(pow(delta_1,3)-pow(delta_d,3))))- (2.*r2/(3.*Q))*(1.5*Q*delta_d- 3.*0.5*Q*(Q+L-1.)*delta_d*delta_d);
 			inside = 0.;
 			}
 			else{
-				corR = ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1) -dist* omega_k*r2*r2/(3.*Q) ;
+				cor = ((4.5*Q+3.*H*H*r2*r2)/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1) -dist* omega_k*r2*r2/(3.*Q) ;
 			inside = 1.;
 			}
 		}
-		for (i = 0; i < 3; i++) (*part).pos[i] += inside*coeff*gradxi[i] +(((*part).pos[i]-0.5)/dist) *corR;
-		}
+		for (i = 0; i < 3; i++) (*part).pos[i] += inside*coeff*gradxi[i] +(((*part).pos[i]-0.5)/dist) *cor;
 		
 	}
 	//End nicmodify
@@ -189,7 +187,7 @@ Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * pa
 	gradPhi[2] /= lat_resolution;  
 	
 	// start nicmodify
-	if (param==NULL){
+	if (params==NULL){
 		for (i = 0 ; i < 3; i++)
 		{
 			(*part).vel[i] = -gradPhi[i] * coeff;
@@ -197,17 +195,20 @@ Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * pa
 		}
 	}
 	else{
-		double r2, dist, delta_1, delta_d, r1, corR, a_in, inside, Q, omega_k, L;
-		omega_k= params[0];
-		r2= params[1];   //0.5- 2.*lat_resolution
-		Q= params[3];
-		L=params[4];
-		delta_1= params[5];
+		double r2, dist, delta_1, delta_d, r1, cor, a_in, inside, Q, omega_k, L, H;
+		
+		omega_k = params[0];
+		r2 = params[1];   //0.5- 2.*lat_resolution
+		H = params[2];
+		Q = params[3];
+		L = params[4];
+		delta_1 = params[5];
+		a_in = params[6];
 		
 		r1= r2*(1. - delta_1);
 		
 		inside= 0.;
-		dist=0.0;
+		dist=0.;
 		
 		for (i = 0; i < 3; i++) dist = dist + pow(((*part).pos[i]-0.5),2.);
 		dist=sqrt(dist);
@@ -215,28 +216,28 @@ Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * pa
 		delta_d= (r2- dist)/r2;
 			
 		if(dist>=r2){
-			corR = 0.;
-			corR = corR + ((9.*params[2]*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
-			corR = corR + ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* params[2]*0.25*omega_k*(r1- r1*5./3.) -2.*params[2] *(5./4.)*Q*delta_1*delta_1+param[2] *(5./4.)*Q*delta_1*delta_1);
+			cor = 0.;
+			cor = cor + ((9.*H*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
+			cor = cor + ((4.5*Q+3.*H*H*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* H*0.25*omega_k*(r1- r1*5./3.) -2.*H *(5./4.)*Q*delta_1*delta_1+params[2] *(5./4.)*Q*delta_1*delta_1);
 			inside= 0.;
 		}
 		else{
 			if(dist>=r1){
-				corR = (2.*r2/3.)*( 3.*0.5*params[1]*(-Q+2.*L)*delta_d*delta_d);
-				corR = corR + ((9.*params[2]*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
-				corR = corR + ((4.5*Q+3.*params[2]*params[2]*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* params[2]*0.25*omega_k*(r1- r1*5./3.) -2.*params[2] *(5./4.)*Q*delta_1*delta_1+ params[2]*(5./4.)*Q*delta_1*delta_1 );
+				cor = (2.*r2/3.)*( 3.*0.5*params[1]*(-Q+2.*L)*delta_d*delta_d);
+				cor = cor + ((9.*H*L)/(7.5*Q))*((r1*r1*r1/(dist*dist))*(0.25*omega_k*(r1*r1- r1*r1*5./3.) - (5./4.)*Q*delta_1*delta_1));
+				cor = cor + ((4.5*Q+3.*H*H*r2*r2)/(7.5*Q))*(r1*r1*r1/(dist*dist))*(-5.* r2*delta_1* H*0.25*omega_k*(r1- r1*5./3.) -2.*H *(5./4.)*Q*delta_1*delta_1+ H*(5./4.)*Q*delta_1*delta_1 );
 				inside= 0.;
 			}
 			else{
-				corR = - dist*omega_k *r2*r2* params[2]/ (3.*Q) ;
-				corR = corR + (9.*params[2]*L/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1);
-				corR = corR + ((4.5 * Q + 3. * params[2] * params[2] * r2 * r2) / (7.5 * Q)) *(0.25 * omega_k* (dist * r1 * r2 * delta_1 * params[2] * 10./3.) - (5./2.) * dist * Q * delta_1 * delta_1 * params[2] + (5./4.) * dist * Q * delta_1 * delta_1);
+				cor = - dist*omega_k *r2*r2* H/ (3.*Q) ;
+				cor = cor + (9.*H*L/(7.5*Q))*(0.25*omega_k*(dist*dist*dist- dist*r1*r1*5./3.) - (5./4.)*dist*Q*delta_1*delta_1);
+				cor = cor + ((4.5 * Q + 3. * H * H * r2 * r2) / (7.5 * Q)) *(0.25 * omega_k* (dist * r1 * r2 * delta_1 * H * 10./3.) - (5./2.) * dist * Q * delta_1 * delta_1 * H + (5./4.) * dist * Q * delta_1 * delta_1);
 				inside=1.;
 			}
 		}
 		for (i = 0 ; i < 3; i++)
 		{
-			(*part).vel[i] = -gradPhi[i] * coeff * inside + (((*part).pos[i]-0.5)/dist)* corR *param[6];
+			(*part).vel[i] = -gradPhi[i] * coeff * inside + (((*part).pos[i]-0.5)/dist)* cor *a_in ;
 			v2 += (*part).vel[i] * (*part).vel[i];
 		}
 	}
@@ -2096,25 +2097,25 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	pcls_cdm->initialize(pcls_cdm_info, pcls_cdm_dataType, &(phi->lattice()), boxSize);
 	
 	//start nicmodify
-	if (cosmo.Omega_k > 0){
-		double params[7];
-		
-		params[0] = cosmo.Omega_k;	//curvature cosmological parameter
-		params[1] = 0.45;		// cosmo.external_shell //The external shell in case of curved universe simulation
-		params[2] = Hconf(1./(1.+sim.z_in), fourpiG, cosmo); //dot(a)(t_ini)
-		params[3] = cosmo.Omega_m * Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)* param[1] *param[1] * (1.+sim.z_in);  //Q
-		params[4] = (1./3.)* cosmo.Omega_Lambda*  Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)*param[1]*param[1]/ ((1.+sim.z_in)*(1.+sim.z_in)); //L
-		params[5] = param[1]* param[1]* params[0]/(3.*param[3])+ param[1]* param[1]* params[0]*param[1]* param[1]* params[0]* (param[3] + param[4]-2.)/(9.*param[3]*param[3]); //delta_r1
-		params[6] = 1./ (1.+sim.z_in);
-	}
+
+	double param[7];
+	
+	param[0] = cosmo.Omega_k;	//curvature cosmological parameter
+	param[1] = 0.45;		// cosmo.external_shell //The external shell in case of curved universe simulation
+	param[2] = Hconf(1./(1.+sim.z_in), fourpiG, cosmo); //dot(a)(t_ini)
+	param[3] = cosmo.Omega_m * Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)* param[1] *param[1] * (1.+sim.z_in);  //Q
+	param[4] = (1./3.)* cosmo.Omega_Lambda*  Hconf(1., fourpiG, cosmo)*Hconf(1., fourpiG, cosmo)*param[1]*param[1]/ ((1.+sim.z_in)*(1.+sim.z_in)); //L
+	param[5] = param[1]* param[1]* param[0]/(3.*param[3])+ param[1]* param[1]* param[0]*param[1]* param[1]* param[0]* (param[3] + param[4]-2.)/(9.*param[3]*param[3]); //delta_r1
+	param[6] = 1./ (1.+sim.z_in);
+	
 	//end nicmodify
 	
 	initializeParticlePositions(sim.numpcl[0], pcldata, ic.numtile[0], *pcls_cdm);
 	i = MAX;
 	if (sim.baryon_flag == 3)	// baryon treatment = hybrid; displace particles using both displacement fields
-		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., ic_fields, 2, NULL, &max_displacement, &i, 1);
+		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., ic_fields, 2, param, &max_displacement, &i, 1);
 	else
-		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., &chi, 1, NULL, &max_displacement, &i, 1);	// displace CDM particles
+		pcls_cdm->moveParticles(displace_pcls_ic_basic, 1., &chi, 1, param, &max_displacement, &i, 1);	// displace CDM particles
 	
 	sim.numpcl[0] *= (long) ic.numtile[0] * (long) ic.numtile[0] * (long) ic.numtile[0];
 	
@@ -2150,7 +2151,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	
 		initializeParticlePositions(sim.numpcl[1], pcldata, ic.numtile[1], *pcls_b);
 		i = MAX;
-		pcls_b->moveParticles(displace_pcls_ic_basic, 1., &phi, 1, NULL, &max_displacement, &i, 1);	// displace baryon particles
+		pcls_b->moveParticles(displace_pcls_ic_basic, 1., &phi, 1, param, &max_displacement, &i, 1);	// displace baryon particles
 	
 		sim.numpcl[1] *= (long) ic.numtile[1] * (long) ic.numtile[1] * (long) ic.numtile[1];
 	
@@ -2181,12 +2182,12 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 		gsl_spline_free(tk_t1);			
 		
 		if (sim.baryon_flag == 3)	// baryon treatment = hybrid; set velocities using both velocity potentials
-			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., ic_fields, 2) / a;
+			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., ic_fields, 2, param) / a;
 		else
-			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., &chi, 1) / a;	// set CDM velocities
+			maxvel[0] = pcls_cdm->updateVel(initialize_q_ic_basic, 1., &chi, 1, param) / a;	// set CDM velocities
 		
 		if (sim.baryon_flag == 1)
-			maxvel[1] = pcls_b->updateVel(initialize_q_ic_basic, 1., &phi, 1) / a;	// set baryon velocities
+			maxvel[1] = pcls_b->updateVel(initialize_q_ic_basic, 1., &phi, 1, param) / a;	// set baryon velocities
 	}
 	
 	if (sim.baryon_flag > 1) sim.baryon_flag = 0;
@@ -2317,16 +2318,16 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	plan_phi->execute(FFT_BACKWARD);
 	
 	//start nicmodify (adding curved potential)
-	if (params != NULL){
-		double dist, delta_d, r2, r1, delta_1, corR, inside, Q, omega_k;
+	if (param != NULL){
+		double dist, delta_d, r2, r1, delta_1, cor, inside, Q, L, omega_k;
 		inside = 1.;
 		
-		r2= params[1];
-		delta_1= params[5];
+		omega_k= param[0];
+		r2= param[1];
+		Q = param[3];
+		L = param[4];
+		delta_1= param[5];
 		r1= r2*(1.- delta_1);
-		Q = params[3];
-		L = params[4]
-		omega_k= params[0];
 		
 		
 		for(x.first();x.test();x.next())
@@ -2341,22 +2342,22 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 			
 			
 			if(dist>= r2) {
-				corR=0.;
+				cor=0.;
 				inside=0.;
 			}
 			else{
 				if(dist>= r1){ 
-					corR= - 0.75* Q*delta_d * delta_d + 0.5* Q*(Q+ L-1.)*delta_d * delta_d * delta_d ;  
+					cor = - 0.75* Q*delta_d * delta_d + 0.5* Q*(Q+ L-1.)*delta_d * delta_d * delta_d ;  
 					//corR= - Q* (0.5* dist *dist + r2*r2*r2/dist - 1.5 *r2*r2);
 					inside=0.;
 				}
 				else{
-					corR= omega_k*(dist*dist - r1*r1)*0.25-  0.75 *Q * delta_1*delta_1 + 0.5* Q*(Q+ L-1.)*delta_1 * delta_1 * delta_1; 
+					cor = omega_k*(dist*dist - r1*r1)*0.25-  0.75 *Q * delta_1*delta_1 + 0.5* Q*(Q+ L-1.)*delta_1 * delta_1 * delta_1; 
 					//corR= 0.3 *omega_k *(dist*dist- r1*r1) - Q* (0.5 *r1 *r1 + r2*r2*r2/r1 - 1.5* r2*r2);
 					inside=1.;
 				}
 			}
-			(*phi)(x) = (*phi)(x) * inside + corR;
+			(*phi)(x) = (*phi)(x) * inside + cor ;
 		}
 	
 	}
