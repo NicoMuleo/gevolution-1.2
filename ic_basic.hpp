@@ -88,7 +88,7 @@ void displace_pcls_ic_basic(double coeff, double lat_resolution, part_simple * p
 		*outputs = coeff * sqrt(gradxi[0]*gradxi[0] + gradxi[1]*gradxi[1] + gradxi[2]*gradxi[2]);
 
 		//Start nicmodify (adding curved potential)
-	if (params == NULL) {
+	if (params[0] == 0.) {
 		for (i = 0; i < 3; i++) (*part).pos[i] += coeff*gradxi[i];
 	}
 	else {
@@ -187,7 +187,7 @@ Real initialize_q_ic_basic(double coeff, double lat_resolution, part_simple * pa
 	gradPhi[2] /= lat_resolution;  
 	
 	// start nicmodify
-	if (params==NULL){
+	if (params[0] == 0.){
 		for (i = 0 ; i < 3; i++)
 		{
 			(*part).vel[i] = -gradPhi[i] * coeff;
@@ -2318,7 +2318,7 @@ void generateIC_basic(metadata & sim, icsettings & ic, cosmology & cosmo, const 
 	plan_phi->execute(FFT_BACKWARD);
 	
 	//start nicmodify (adding curved potential)
-	if (param != NULL){
+	if (param[0] > 0){
 		double dist, delta_d, r2, r1, delta_1, cor, inside, Q, L, omega_k;
 		inside = 1.;
 		
