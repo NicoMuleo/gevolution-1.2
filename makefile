@@ -1,6 +1,5 @@
 # programming environment
 COMPILER     := mpic++
-
 INCLUDE      := -I../LATfield2 -I/usr/include/hdf5/openmpi -I../class_public-2.9.4/include -I/usr/include -I/usr/include/healpix_cxx #-I/usr/local/hdf5/bin -I/usr/local/hdf5/include -I/usr/local/hdf5/lib  # add the path to LATfield2 and other libraries (if necessary)
 LIB          := -lfftw3 -lm -lhdf5 -lgsl -lgslcblas -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi -L../class_public-2.9.4 -lclass -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -lchealpix -lcfitsio -L/usr/lib/x86_64-linux-gnu
 
@@ -13,15 +12,9 @@ HEADERS      := $(wildcard *.hpp)
 DLATFIELD2   := -DFFT3D -DHDF5
 
 # optional compiler settings (LATfield2)
-<<<<<<< HEAD
 DLATFIELD2   += -DH5_HAVE_PARALLEL
 #DLATFIELD2   += -DEXTERNAL_IO
 #DLATFIELD2   += -DSINGLE     # switches to single precision, use LIB -lfftw3f
-=======
-#DLATFIELD2   += -DH5_HAVE_PARALLEL
-#DLATFIELD2   += -DEXTERNAL_IO # enables I/O server (use with care)
-#DLATFIELD2   += -DSINGLE      # switches to single precision, use LIB -lfftw3f
->>>>>>> 939ce842e3b69fabbd9ffd3a77aaef79334f5614
 
 # optional compiler settings (gevolution)
 DGEVOLUTION  := -DPHINONLINEAR
@@ -41,10 +34,7 @@ $(EXEC): $(SOURCE) $(HEADERS) makefile
 	
 lccat: lccat.cpp
 	$(COMPILER) $< -o $@ $(OPT) $(DGEVOLUTION) $(INCLUDE)
-	
-lcmap: lcmap.cpp
-	$(COMPILER) $< -o $@ $(OPT) -fopenmp $(DGEVOLUTION) $(INCLUDE) $(LIB) $(HPXCXXLIB)
 
 clean:
-	-rm -f $(EXEC) lccat lcmap
+	-rm -f $(EXEC) lccat
 
