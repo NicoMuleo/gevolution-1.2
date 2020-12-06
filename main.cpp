@@ -28,7 +28,7 @@
 //
 // Author: Julian Adamek (Université de Genève & Observatoire de Paris & Queen Mary University of London)
 //
-// Last modified: April 2019
+// Last modified: November 2019
 //
 //////////////////////////
 
@@ -64,17 +64,13 @@
 #endif
 
 using namespace std;
-
 using namespace LATfield2;
 
 int main(int argc, char **argv)
 {
-	
 #ifdef BENCHMARK
 	//benchmarking variables
-	
 	double ref_time, ref2_time, cycle_start_time;
-	
 	double initialization_time;
 	double run_time;
 	double cycle_time=0;
@@ -88,8 +84,7 @@ int main(int argc, char **argv)
 	double update_q_time = 0;
 	int update_q_count = 0;
 	double moveParts_time = 0;
-	int  moveParts_count =0;
-	
+	int  moveParts_count =0;	
 #endif  //BENCHMARK
 	
 	int n = 0, m = 0;
@@ -111,7 +106,7 @@ int main(int argc, char **argv)
 	metadata sim;
 	cosmology cosmo;
 	icsettings ic;
-	Real T00hom;
+	double T00hom;
 
 #ifndef H5_DEBUG
 	H5Eset_auto2 (H5E_DEFAULT, NULL, NULL);
@@ -156,6 +151,11 @@ int main(int argc, char **argv)
 #ifndef EXTERNAL_IO
 	parallel.initialize(n,m);
 #else
+	if (!io_size || !io_group_size)
+	{
+		cout << "invalid number of I/O tasks and group sizes for I/O server (-DEXTERNAL_IO)" << endl;
+		exit(-1000);
+	}
 	parallel.initialize(n,m,io_size,io_group_size);
 	if(parallel.isIO()) ioserver.start();
 	else
@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 	
 	COUT << COLORTEXT_WHITE << endl;	
 	COUT << "  _   _      _         __ ,  _" << endl;
-	COUT << " (_| (-' \\/ (_) (_ (_| (  ( (_) /\\/	version 1.2 beta    running on " << n*m << " cores." << endl;
+	COUT << " (_| (-' \\/ (_) (_ (_| (  ( (_) /\\/	version 1.2         running on " << n*m << " cores." << endl;
 	COUT << "  -'" << endl << COLORTEXT_RESET << endl;
 	
 	if (settingsfile == NULL)
@@ -190,8 +190,8 @@ int main(int argc, char **argv)
 
 #ifdef HAVE_CLASS
 	background class_background;
+	thermo class_thermo;
   	perturbs class_perturbs;
-  	spectra class_spectra;
   	
   	if (precisionfile != NULL)
 	  	numparam = loadParameterFile(precisionfile, params);
@@ -352,10 +352,10 @@ int main(int argc, char **argv)
 #ifdef HAVE_CLASS
 	if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
 	{
-		initializeCLASSstructures(sim, ic, cosmo, class_background, class_perturbs, class_spectra, params, numparam);
+		initializeCLASSstructures(sim, ic, cosmo, class_background, class_thermo, class_perturbs, params, numparam);
 		if (sim.gr_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.) && (ic.generator == ICGEN_BASIC || (ic.generator == ICGEN_READ_FROM_DISK && cycle == 0)))
 		{
-			prepareFTchiLinear(class_background, class_perturbs, class_spectra, scalarFT, sim, ic, cosmo, fourpiG, a);
+			prepareFTchiLinear(class_background, class_perturbs, scalarFT, sim, ic, cosmo, fourpiG, a);
 			plan_source.execute(FFT_BACKWARD);
 			for (x.first(); x.test(); x.next())
 				chi(x) += source(x);
@@ -374,7 +374,7 @@ int main(int argc, char **argv)
 		projection_init(&source);
 #ifdef HAVE_CLASS
 		if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
-			projection_T00_project(class_background, class_perturbs, class_spectra, source, scalarFT, &plan_source, sim, ic, cosmo, fourpiG, a);
+			projection_T00_project(class_background, class_perturbs, source, scalarFT, &plan_source, sim, ic, cosmo, fourpiG, a);
 #endif
 		if (sim.gr_flag > 0)
 		{
@@ -455,8 +455,8 @@ int main(int argc, char **argv)
 			T00hom = 0.;
 			for (x.first(); x.test(); x.next())
 				T00hom += source(x);
-			parallel.sum<Real>(T00hom);
-			T00hom /= (Real) numpts3d;
+			parallel.sum<double>(T00hom);
+			T00hom /= (double) numpts3d;
 			
 			if (cycle % CYCLE_INFO_INTERVAL == 0)
 			{
@@ -546,7 +546,7 @@ int main(int argc, char **argv)
 #ifdef HAVE_CLASS
 		if (sim.radiation_flag > 0 && a < 1. / (sim.z_switch_linearchi + 1.))
 		{
-			prepareFTchiLinear(class_background, class_perturbs, class_spectra, scalarFT, sim, ic, cosmo, fourpiG, a);
+			prepareFTchiLinear(class_background, class_perturbs, scalarFT, sim, ic, cosmo, fourpiG, a);
 			projectFTscalar(SijFT, scalarFT, 1);
 		}
 		else
@@ -638,7 +638,7 @@ int main(int argc, char **argv)
 
 			writeSpectra(sim, cosmo, fourpiG, a, pkcount,
 #ifdef HAVE_CLASS
-				class_background, class_perturbs, class_spectra, ic,
+				class_background, class_perturbs, ic,
 #endif
 				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
@@ -661,7 +661,7 @@ int main(int argc, char **argv)
 		{
 			writeSpectra(sim, cosmo, fourpiG, a, pkcount,
 #ifdef HAVE_CLASS
-				class_background, class_perturbs, class_spectra, ic,
+				class_background, class_perturbs, ic,
 #endif
 				&pcls_cdm, &pcls_b, pcls_ncdm, &phi, &chi, &Bi, &source, &Sij, &scalarFT, &BiFT, &SijFT, &plan_phi, &plan_chi, &plan_Bi, &plan_source, &plan_Sij
 #ifdef CHECK_B
@@ -882,7 +882,7 @@ int main(int argc, char **argv)
 
 #ifdef HAVE_CLASS
 	if (sim.radiation_flag > 0 || sim.fluid_flag > 0)
-		freeCLASSstructures(class_background, class_perturbs, class_spectra);
+		freeCLASSstructures(class_background, class_thermo, class_perturbs);
 #endif
 
 #ifdef BENCHMARK
