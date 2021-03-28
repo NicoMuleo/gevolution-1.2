@@ -1,0 +1,128 @@
+CC=/usr/local/mpi/bin/mpicc ./configure --enable-parallel --prefix=/usr/local
+
+PER ACCEDERE
+ ssh muleo@hep.ph.qmul.ac.uk
+ ssh astpc103
+
+PER SCARICARE (-u sovrascrive solo se il file è più recente)
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output/lcdm_background.dat .  
+ scp -r muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_sds02 .  
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/raytracer_output.dat .
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_sds55/lcdm_lightcone_cdm .
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_sds49/raytracer_output.dat .output_sds49/
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_struhres/lcdm_snap004_T00.h5 .
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/settings_sds5* . 
+ scp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/raytracer_sds50.ini 
+ 
+ scp muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds59/lcdm_lightcone_cdm .
+ scp muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds59/lcdm_snap004_T00.h5 .
+ scp muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds56/raytracer_output.dat .
+ scp muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds63/lcdm_background.dat .
+ 
+ rsync -av --dry-run (partenza) (arrivo)
+ rsync -av --dry-run muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_sds04/ output_sds04/ 
+ rsync -av  muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_sds27/ output_sds16/
+ 
+ rsync -av --dry-run muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds52/ output_sds52/
+ rsync -av muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds64/ output_sds64/
+ 
+ 
+PER CARICARE
+ scp main.cpp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/
+ scp ic_basic.hpp muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/
+ scp settings.ini muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/
+ scp lcdm_lightcone_cdm.txt muleo@hep.ph.qmul.ac.uk:/.astro/users2/muleo/gevolution-1.2/output_sds49/
+ 
+ 
+ scp lcdm_lightcone_cdm.txt muleo@hep.ph.qmul.ac.uk:/.data/muleo/output_sds62/
+ 
+PER AVVIARE GEVOLUTION
+ mpirun -np 4 ./gevolution -n 2 -m 2 -s settings_sds64.ini
+ mpirun -np 16 ./gevolution -n 4 -m 4 -s settings_sds64.ini 
+
+PER AVVIARE GEVOLUTION (IN POCO SPAZIO)
+ mpirun --oversubscribe -np 4 ./gevolution -n 2 -m 2 -s settings.ini
+
+PER AVVIARE IN BACKGROUND  nohup (comando) &
+ nohup mpirun -np 16 ./gevolution -n 4 -m 4 -s settings_sds64.ini &
+
+PER CONTROLLARE
+ tail -f nohup.out
+ 
+PER CONTROLLARE LO SPAZIO
+ du -h
+ 
+ 
+PER AVVIARE lccat
+ ./lccat -s settings.ini -c 113-117 -l 0,1
+
+ 
+ 
+PER COMPILARE RAYTRACER
+g++ ./raytracer.cpp -o raytracer -std=c++11 -O2 -I../Healpix_3.50/include -L../Healpix_3.50/lib -DLIGHTCONE_THICKNESS=1 -lgsl -lgslcblas -lchealpix
+SUL MIO PC
+g++ ./raytracer.cpp -o raytracer -std=c++11 -O2 -I/usr/include -L/usr/lib/x86_64-linux-gnu -DLIGHTCONE_THICKNESS=1 -lgsl -lgslcblas -lchealpix
+
+g++ raytracer.cpp -o raytracer -std=c++11 -O3 -fopenmp -DCOLORTERMINAL -DLIGHTCONE_THICKNESS=3 -I/usr/include -L/usr/lib/x86_64-linux-gnu -lgsl -lgslcblas -lchealpix -lcfitsio
+
+
+PER AVVIARE RAYTRACER
+./raytracer -s raytracer_sds47.ini
+nohup ./raytracer -s raytracer_sds63.ini &
+./raytracer -s raytracer_13.ini
+
+PER COMPILARE REORDERMAPS
+g++ reordermaps.cpp -o reordermaps -std=c++11 -O3 -I/astro/adamek/local/include -L/astro/adamek/local/lib -lchealpix -lcfitsio
+
+PER AVVIARE REORDERMAP
+for f in /data/muleo/output_sds63/*.map; do ./reordermaps $f;  done
+
+
+REORDERMAP
+for f in output_sds34/*.map
+
+ for f in output_sds34/*.map
+> do
+> ./reordermaps $f
+> done
+
+for f in output_struhres/*.map; do ./reordermaps $f;  done
+for f in output_sds49/*.map; do ./reordermaps $f;  done
+
+for f in output_sds49/*.map; do ./reordermaps $f;  done
+
+
+for f in ../gevolution_output/output_12/*.map; do ./reordermaps $f;  done
+
+
+PER UNIRE I LIGHTCONE DELLE PARTICELLE
+./lccat -s settings_13.ini -c 0094-0117
+./lccat -s settings_sds58.ini -c 0086-0116
+
+
+
+CONVERTIRE I FILE .map (eliminare il numerino del lightcone)
+ for i in {102..111}; do  cp 'lcdm_lightcone1_0'$i'_phi.map'   'lcdm_lightcone_0'$i'_phi.map' ; done
+ for i in {86..99}; do  cp 'lcdm_lightcone1_00'$i'_phi.map'   'lcdm_lightcone_00'$i'_phi.map' ; done
+  cp lcdm_lightcone0_0117_phi.map   lcdm_lightcone_0117_phi.map
+ 
+		QUANDO CI SONO 2 .map SOVRAPPOSTI
+ (cat lcdm_lightcone0_0115_phi.map lcdm_lightcone1_0115_phi.map > lcdm_lightcone_0115_phi.map)
+ for i in {112..116}; do cat 'lcdm_lightcone0_0'$i'_phi.map' 'lcdm_lightcone1_0'$i'_phi.map' > 'lcdm_lightcone_0'$i'_phi.map' ; done
+ 
+ 
+ TUTTO IN UNO
+ 
+for i in {91..99}; do  cp 'lcdm_lightcone1_00'$i'_phi.map'   'lcdm_lightcone_00'$i'_phi.map' ; done
+for i in {100..111}; do  cp 'lcdm_lightcone1_0'$i'_phi.map'   'lcdm_lightcone_0'$i'_phi.map' ; done
+for i in {112..116}; do cat 'lcdm_lightcone0_0'$i'_phi.map' 'lcdm_lightcone1_0'$i'_phi.map' > 'lcdm_lightcone_0'$i'_phi.map' ; done
+cp lcdm_lightcone0_0117_phi.map   lcdm_lightcone_0117_phi.map
+
+for i in {102..111}; do  cp '/data/muleo/output_sds52/lcdm_lightcone1_0'$i'_phi.map'   '/data/muleo/output_sds52/lcdm_lightcone_0'$i'_phi.map' ; done
+for i in {112..116}; do cat '/data/muleo/output_sds52/lcdm_lightcone0_0'$i'_phi.map' '/data/muleo/output_sds52/lcdm_lightcone1_0'$i'_phi.map' > '/data/muleo/output_sds52/lcdm_lightcone_0'$i'_phi.map' ; done
+cp /data/muleo/output_sds52/lcdm_lightcone0_0117_phi.map   /data/muleo/output_sds52/lcdm_lightcone_0117_phi.map
+
+
+for i in {102..111}; do  cp '../gevolution_output/output_12/lcdm_lightcone1_0'$i'_phi.map'   '../gevolution_output/output_12/lcdm_lightcone_0'$i'_phi.map' ; done
+for i in {112..116}; do cat '../gevolution_output/output_12/lcdm_lightcone0_0'$i'_phi.map' '../gevolution_output/output_12/lcdm_lightcone1_0'$i'_phi.map' > '../gevolution_output/output_12/lcdm_lightcone_0'$i'_phi.map' ; done
+cp ../gevolution_output/output_12/lcdm_lightcone0_0117_phi.map   ../gevolution_output/output_12/lcdm_lightcone_0117_phi.map
